@@ -1,0 +1,262 @@
+package util;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.Vector;
+
+public class IntegerSparseMatrix extends SparseMatrix{
+	private int numRows;
+	private int numColumns;
+	private HashMap<Integer, Integer>[] row;
+	
+	@SuppressWarnings("unchecked")
+	public IntegerSparseMatrix(int numOfRow, int numOfColumn){
+		this.numRows = numOfRow;
+		this.numColumns = numOfColumn;
+		row = new HashMap[numOfRow];
+		for(int i=0; i<numOfRow; i++){
+			row[i] = new HashMap<Integer, Integer>();
+		}
+	}
+	
+	// import matrix from file
+	@SuppressWarnings("unchecked")
+	public IntegerSparseMatrix(int numOfRow, int numOfColumn, String fileType, String file) throws Exception{
+		String line;
+		int value;
+		int lineNumber=0;
+		this.numRows = numOfRow;
+		this.numColumns = numOfColumn;
+		row = new HashMap[numOfRow];
+		
+		for(int i=0; i<numOfRow; i++){
+			row[i] = new HashMap<Integer, Integer>();
+		}
+		
+		BufferedReader fileReader = new BufferedReader(new FileReader(file));
+		
+		if(fileType.toLowerCase() == "normal"){
+		    while((line = fileReader.readLine()) != null){
+		    	String[] elements = line.split("\\s+");
+		    	for(int j=0; j<elements.length;j++){
+					if(( value = Integer.valueOf(elements[j]) ) !=0 && j<numOfColumn){
+		    			row[lineNumber].put(j, value);
+		    		}
+		    	}
+		    	lineNumber++;
+		    }
+		}else if(fileType.toLowerCase() == "special"){
+			String docLine;
+		    while((line = fileReader.readLine()) != null){
+		    	docLine = fileReader.readLine();
+		    	String[] elements = line.split("\\s+");
+		    	int docWords = Integer.valueOf(elements[0]);
+		    	
+		    	String[] wordByCount = docLine.split("\\s+");
+		    	
+		    	if(docWords*2 != wordByCount.length){
+		    		System.err.println("Matrix File Corrupted");
+		    		System.err.println(line);
+		    		System.exit(0);
+		    	}
+		    	
+		    	for(int i = 0; i < docWords ; i++){
+		    		this.setValue(lineNumber, Integer.valueOf(wordByCount[2*i]), Integer.valueOf(wordByCount[2*i+1]) );
+		    	}
+		    	lineNumber++;
+		    }
+		}
+	    fileReader.close();
+	}
+	
+	@Override
+	public int getNumRows() {
+		return numRows;
+	}
+
+	@Override
+	public int getNumColumns() {
+		return numColumns;
+	}
+	
+	// set value of matrix(rowIdx, colIdx) to value
+	public void setValue(int rowIdx, int colIdx, int value){
+		if(value == 0){
+			row[rowIdx].remove(colIdx);
+		}
+		row[rowIdx].put(colIdx, value);		
+		
+	}
+	
+	// get value of matrix(rowIdx, colIdx)
+	public int getValue(int rowIdx, int colIdx){
+		if (row[rowIdx].containsKey(colIdx)){
+			return row[rowIdx].get(colIdx);
+		}
+		return 0;
+	}
+	
+	public void incValue(int rowIdx, int colIdx){
+		if (row[rowIdx].containsKey(colIdx)){
+			row[rowIdx].put(colIdx, row[rowIdx].get(colIdx)+1);
+		}else{
+			row[rowIdx].put(colIdx, 1);
+		}
+	}
+	
+	public void incValue(int rowIdx, int colIdx, int value){
+		if (row[rowIdx].containsKey(colIdx)){
+			row[rowIdx].put(colIdx, row[rowIdx].get(colIdx)+value);
+		}else{
+			row[rowIdx].put(colIdx, value);
+		}
+	}
+	
+	public void decValue(int rowIdx, int colIdx){
+		if (row[rowIdx].containsKey(colIdx)){
+			int temp = row[rowIdx].get(colIdx)-1;
+			row[rowIdx].put(colIdx, temp);
+			if (temp == 0 ){
+				row[rowIdx].remove(colIdx);
+			}
+		}
+	}
+	
+	public HashMap<Integer, Integer> getRow(int rowIdx){
+		return row[rowIdx];
+	}
+	
+	// get sum of row elements
+	public int getRowSum(int rowIdx){
+		int sum=0;
+		Set<Integer> keys =  row[rowIdx].keySet();
+		
+		Iterator<Integer> iter = keys.iterator();
+		
+		while(iter.hasNext()){
+			sum+=row[rowIdx].get(iter.next());
+		}
+		return sum;
+	}
+	
+	public HashMap<Integer, Integer> getColumn(int colIdx){
+		if(colIdx > numColumns){
+			return null;
+		}
+		HashMap<Integer, Integer> col = new HashMap<Integer, Integer>();
+		for(int i=0; i<numRows; i++){
+			if(row[i].containsKey(colIdx)){
+				int value = row[i].get(colIdx);
+				if (value !=0 ){
+					col.put(i, value);
+				}
+			}
+		}
+		return col;
+	}
+	
+	// get sum of column elements
+	public int getColSum(int colIdx){
+		if(colIdx > numColumns){
+			return 0;
+		}
+		int sum=0;
+		for(int i=0; i<numRows; i++){
+			if (row[i].containsKey(colIdx)){
+				int value = row[i].get(colIdx);
+				if (value !=0 ){
+					sum += value;
+				}
+			}
+		}		
+		return sum;
+	}
+	
+	public Vector<Integer> getSortedRowIndex(int row, int n){
+		Vector<Integer> sortedList = new Vector<Integer>();
+		
+		for(int i=0 ; i < n ; i++){
+			int maxValue = Integer.MIN_VALUE;
+			int maxIndex = -1;
+			for(int col=0 ; col<numColumns ; col++){
+				if(getValue(row, col) > maxValue){
+					boolean exist = false;
+					for(int j=0 ; j<sortedList.size(); j++){
+						if (sortedList.get(j) == col){
+							exist = true;
+							break;
+						}
+					}
+					if(!exist){
+						maxValue = getValue(row, col);
+						maxIndex = col;
+					}
+				}
+			}
+			sortedList.add(maxIndex);
+		}
+		
+		return sortedList;
+	}
+
+	public Vector<Integer> getSortedColIndex(int col, int n){
+		Vector<Integer> sortedList = new Vector<Integer>();
+		
+		for(int i=0 ; i < n ; i++){
+			int maxValue = Integer.MIN_VALUE;
+			int maxIndex = -1;
+			for(int row=0 ; row<numRows ; row++){
+				if(getValue(row, col) > maxValue){
+					boolean exist = false;
+					for(int j=0 ; j<sortedList.size(); j++){
+						if (sortedList.get(j) == row){
+							exist = true;
+							break;
+						}
+					}
+					if(!exist){
+						maxValue = getValue(row, col);
+						maxIndex = row;
+					}
+				}
+			}
+			sortedList.add(maxIndex);
+		}
+		
+		return sortedList;
+	}
+	
+	public void writeMatrixToCSVFile(String outputFilePath) throws Exception{
+		PrintWriter out = new PrintWriter(new FileWriter(new File(outputFilePath)));
+		
+		for(int row=0; row < numRows ; row++){
+			for(int col=0; col < numColumns ; col++){
+				if(col == 0) out.print(getValue(row, col));
+				else out.print(","+getValue(row, col));
+			}
+			out.println();
+		}
+
+		out.close();
+	}
+
+	public IntegerSparseMatrix copy() {
+		// TODO Auto-generated method stub
+		IntegerSparseMatrix temp = new IntegerSparseMatrix(this.numRows, this.numColumns);
+		
+		for(int row=0; row < numRows ; row++){
+			for(int col=0; col < numColumns ; col++){
+				temp.setValue(row, col, this.getValue(row, col));
+			}
+		}
+		
+		return temp;
+	}
+
+}
