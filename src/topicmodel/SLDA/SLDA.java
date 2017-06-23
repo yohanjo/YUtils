@@ -1,4 +1,6 @@
 /**
+ * Sentence LDA in the WSDM11 paper.
+ * 
  * @author Yohan Jo
  * @version June 22, 2017
  */
