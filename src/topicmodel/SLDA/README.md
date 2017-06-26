@@ -1,4 +1,6 @@
-# SLDA
+# Sentence LDA
+Code for the sentence LDA. Unlike LDA, SLDA assigns a topic to each sentence instead of each word, and all words in the same sentence are drawn from the same topic. The model is described in the WSDM paper: [Aspect and Sentiment Unification Model for Online Review Analysis](http://dl.acm.org/citation.cfm?id=1935932).
+
 ## Input data
 A csv file that has two columns with the headings:
  * `DocId`: Unique document ID
