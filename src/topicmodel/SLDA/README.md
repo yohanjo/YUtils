@@ -1,8 +1,8 @@
 # SLDA
 ## Input data
 A csv file that has two columns with the headings:
- * DocId: Unique document ID
- * Text: Text of the document
+ * `DocId`: Unique document ID
+ * `Text`: Text of the document
 
 ## Input Arguments
 ```
