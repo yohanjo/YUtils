@@ -210,51 +210,52 @@ public class CSM implements Callable<Void> {
 
     public static void main (String [] args) throws Exception {
         // Load command arguments
-        Parameters inParams = new Parameters();
-        JCommander cmd = new JCommander(inParams, args);
-        if (inParams.help) {
-            cmd.usage();
+        Parameters params = new Parameters();
+        JCommander jc = JCommander.newBuilder().addObject(params).build();
+        jc.parse(args);
+        if (params.help) {
+            jc.usage();
             System.exit(0);
         }
 
-        if (inParams.model != null) {
+        if (params.model != null) {
             updateParams = false;
-            modelPathPrefix = inParams.model;
+            modelPathPrefix = params.model;
         } else {
             updateParams = true;
         }
-        if (inParams.background != null) {
+        if (params.background != null) {
             useBackground = true;
-            backgroundPathPrefix = inParams.background;
+            backgroundPathPrefix = params.background;
         } else {
             useBackground = false;
         }
-        useDomain = inParams.useDomain;
-        useMultiLevel = !inParams.seq;
-        numThreads = inParams.numThreads;
+        useDomain = params.useDomain;
+        useMultiLevel = !params.seq;
+        numThreads = params.numThreads;
         if (numThreads > 1) useBatchParamUpdate = true;
         else useBatchParamUpdate = false;
-        numStates = inParams.numStates;
-        numFTopics = inParams.numFTopics;
-        numBTopics = inParams.numBTopics;
-        numIters = inParams.numIters;
-        numTmpIters = inParams.numTmpIters;
-        numLogIters = inParams.numLogIters;
-        numProbWords = inParams.numProbWords;
-        fAlpha = inParams.fAlpha;
-        bAlpha = inParams.bAlpha;
-        beta = inParams.beta;
-        gamma = inParams.gamma;
-        kappa = inParams.kappa;
-        eta = inParams.eta;
-        nu = inParams.nu;
-        inDir = inParams.inDir;
-        outDir = inParams.outDir;
-        dataFileName = inParams.dataFileName;
+        numStates = params.numStates;
+        numFTopics = params.numFTopics;
+        numBTopics = params.numBTopics;
+        numIters = params.numIters;
+        numTmpIters = params.numTmpIters;
+        numLogIters = params.numLogIters;
+        numProbWords = params.numProbWords;
+        fAlpha = params.fAlpha;
+        bAlpha = params.bAlpha;
+        beta = params.beta;
+        gamma = params.gamma;
+        kappa = params.kappa;
+        eta = params.eta;
+        nu = params.nu;
+        inDir = params.inDir;
+        outDir = params.outDir;
+        dataFileName = params.dataFileName;
 
-        minNumWords = inParams.minNumWords;
-        minSeqLen = inParams.minSeqLen;
-        tokenization = inParams.tokenize;
+        minNumWords = params.minNumWords;
+        minSeqLen = params.minSeqLen;
+        tokenization = params.tokenize;
 
         // Validity
         if (!new File(inDir).exists()) throw new Exception("There's no input directory " + inDir);
@@ -273,7 +274,7 @@ public class CSM implements Callable<Void> {
         
         // Training
         if (updateParams) {
-            loadStopwords(inParams.stopwordsFileName);
+            loadStopwords(params.stopwordsFileName);
             loadInstances();
             indexizeWords();
             if (useDomain) indexizeDomains();
