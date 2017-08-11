@@ -1,6 +1,6 @@
 /**
  * @author Yohan Jo
- * @version May 23, 2017
+ * @version Aug 11, 2017
  */
 
 package topicmodel.csm;
@@ -497,11 +497,16 @@ public class CSM implements Callable<Void> {
             } else {
                 Vector<String> words = new Vector<String>();
                 for (String w : inst.text.split(" ")) {
-                    if (w.length()==0) continue;
-                    if (stopwords.contains(w)) continue;
-
-                    words.add(w);
-                    if (updateParams) wordCnt.increase(w);
+                    if (w.equals("<SENT>") && !words.isEmpty()) {
+                        inst.sentences.add(words);
+                        words = new Vector<>();
+                    } else {
+                        if (w.length()==0) continue;
+                        if (stopwords.contains(w)) continue;
+    
+                        words.add(w);
+                        if (updateParams) wordCnt.increase(w);
+                    }
                 }
                 if (!words.isEmpty()) inst.sentences.add(words);
             }
