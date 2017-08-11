@@ -5,17 +5,17 @@ An input data file should be a CSV file, where each line represents an utterance
  * `SeqId`: the ID of the conversation to which the utterance belongs. `SeqId` can be any string and must be unique for each conversation.
  * `InstNo`: the index of the utterance. `InstNo` can be any integer and must be unique within a conversation. In case multi-level structure is not used, utterances within each conversation are ordered by `InstNo`.
  * `Author`: the speaker of the utterance. `Author` can be any string.
- * `Text`: the text of the utterance. If text is pre-tokenized, the tokens must be separated by spaces, and sentences by `<SENT>`. For example, `I'm a student. You're a teacher.` may be represented as `I 'm a student . <SENT> You 're a teacher .`. If text is not pre-tokenized and the model is given the `-tok` option, the model will automatically conduct sentence segmentation and tokenization.
+ * `Text`: the text of the utterance. If text is pre-tokenized, the tokens must be separated by spaces, and sentences by `<SENT>`. For example, the sentence `I'm a student. You're a teacher.` may be represented as `I 'm a student . <SENT> You 're a teacher .`. If text is not pre-tokenized and the model is given the `-tok` option, the model will automatically conduct sentence segmentation and tokenization.
  * `Parent` (optional): the `InstNo` of the parent of the utterance. This column is ignored if the model is given the `-seq` option.
  * `Domain` (optional): the domain of the utterance. This column must be present if the model is given the `-domain` option.
 
 ## Command Examples
 
 Training:
--s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2
+`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2`
 
 Fitting:
--s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-G1.0-K0.1-E0.8-N0.9-SEQ-I1000
+`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-G1.0-K0.1-E0.8-N0.9-SEQ-I1000`
 
 
 ## Tips
@@ -27,8 +27,8 @@ Fitting:
 ## Command Examples
 
 Training:
--s 5 -ft 10 -fa 0.1 -b 0.001 -k 0.1 -g 1 -e 0.75 -n 0.5 -mw 1 -ms 1 -d data_dir -data data_train.csv -background background/MalletLDA-content.csv-T100-A0.1-B0.001-I5000 -i 1000 -to 100 -log 100 -th 2
+`-s 5 -ft 10 -fa 0.1 -b 0.001 -k 0.1 -g 1 -e 0.75 -n 0.5 -mw 1 -ms 1 -d data_dir -data data_train.csv -background background/MalletLDA-content.csv-T100-A0.1-B0.001-I5000 -i 1000 -to 100 -log 100 -th 2`
 
 Fitting:
--s 5 -ft 10 -fa 0.1 -b 0.001 -k 0.1 -g 1 -e 0.75 -n 0.5 -mw 1 -ms 1 -d data_dir -data data_test.csv -background background/MalletLDA-content.csv-T100-A0.1-B0.001-I5000 -i 1000 -to 100 -log 100 -th 2 -model models/HSTTM8W-data_train-S5-FT10-BT100-FA0.1-B0.001-G1.0-K0.1-E0.75-N0.5-I1000
+`-s 5 -ft 10 -fa 0.1 -b 0.001 -k 0.1 -g 1 -e 0.75 -n 0.5 -mw 1 -ms 1 -d data_dir -data data_test.csv -background background/MalletLDA-content.csv-T100-A0.1-B0.001-I5000 -i 1000 -to 100 -log 100 -th 2 -model models/HSTTM8W-data_train-S5-FT10-BT100-FA0.1-B0.001-G1.0-K0.1-E0.75-N0.5-I1000`
 
