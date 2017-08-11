@@ -416,7 +416,7 @@ public class CSM implements Callable<Void> {
      * Generates the output file name prefix and necessary output directories.
      */
     public static void setUpOutputEnvironment() throws Exception {
-        outPrefix = "HSTTM8C-" 
+        outPrefix = "CSM-" 
                     + dataFileName.replace(".csv","")
                     + (minSeqLen > 1  ? "-MS"+minSeqLen : "")
                     + "-S" + numStates
