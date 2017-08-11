@@ -1,5 +1,14 @@
 # CSM (Content Word Filtering and Speaker Preference Model)
 
+## Input Data
+An input data file should be a CSV file, where each line represents an utterance (or an instance). This file must have the following columns:
+ * `SeqId`: the ID of the conversation to which the utterance belongs. `SeqId` can be any string and must be unique for each conversation.
+ * `InstNo`: the index of the utterance. `InstNo` can be any integer and must be unique within a conversation. In case multi-level structure is not used, utterances within each conversation are ordered by `InstNo`.
+ * Author: the speaker of the utterance. `Author` can be any string.
+ * Text: the text of the utterance. If text is pre-tokenized, the tokens must be separated by spaces, and sentences are separated by "<SENT>". For example, "I'm a student. You're a teacher." may be represented as "I 'm a student . <SENT> You 're a teacher .". If text is not pre-tokenized and the model is given the `-tok` option, the model will automatically conduct sentence segmentation and tokenization.
+ * Parent (optional): the `InstNo` of the parent of the utterance. This column is ignored if the model is given the `-seq` option.
+ * Domain (optional): the domain of the utterance. This column must be present if the model is given the `-domain` option.
+
 ## Command Examples
 
 Training:
