@@ -532,7 +532,7 @@ public class CSM implements Callable<Void> {
 
     /**
      * Indexizes the loaded instances by changing the words and authors with
-     * the corresponding indices. This methods generates {@link #seqs}.
+     * the corresponding indices. This method generates {@link #seqs}.
      */
     public static void indexizeInstances() {
         for (String seqId : rawSeqs.keySet()) {
