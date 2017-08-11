@@ -6,7 +6,7 @@ Training:
 -s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2
 
 Fitting:
--s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/HSTTM8C-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-G1.0-K0.1-E0.8-N0.9-SEQ-I1000
+-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-G1.0-K0.1-E0.8-N0.9-SEQ-I1000
 
 
 ## Tips
