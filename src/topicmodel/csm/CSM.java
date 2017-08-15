@@ -1,6 +1,6 @@
 /**
  * @author Yohan Jo
- * @version Aug 11, 2017
+ * @version Aug 15, 2017
  */
 
 package topicmodel.csm;
@@ -23,6 +23,7 @@ import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.DoubleFunction;
 import java.util.stream.IntStream;
 
 import org.apache.commons.csv.CSVFormat;
@@ -52,6 +53,8 @@ public class CSM implements Callable<Void> {
     static int numThreads = 1;
     static boolean useBatchParamUpdate;  // Update parameters in batch?
     static boolean updateParams;  // Update parameters?
+    static boolean nuIsNotGiven;  // nu is not given?
+    static boolean etaIsNotGiven;  // eta is not given?
     static boolean useBackground;  // Use pre-trained background?
     static boolean useDomain;  // Use the true domain information?
     static boolean useMultiLevel;  // Use the multi-level structure?
@@ -78,12 +81,10 @@ public class CSM implements Callable<Void> {
     static double fAlpha, sumFAlpha;
     static double bAlpha, sumBAlpha;
     static double beta, sumBeta;
-    static double gamma, sumGamma;
-    static double kappa, sumKappa;
+    static double sGamma, sumSGamma;
+    static double aGamma, sumAGamma;
     static double eta;
     static double nu;
-    
-
     
     static Counter<String> wordCnt = new Counter<>();  // Vocab counts
     static TreeMap<String,Integer> wordIndex = new TreeMap<>();  // Vocab index
@@ -145,25 +146,25 @@ public class CSM implements Callable<Void> {
         @Parameter(names = "-pw", description = "Number of top words to display.")
         public int numProbWords = 100;
 
-        @Parameter(names = "-fa", description = "Foreground alpha.", required=true)
+        @Parameter(names = "-fa", description = "alpha^F.", required=true)
         public double fAlpha = -1;
 
-        @Parameter(names = "-ba", description = "Background alpha.", required=true)
+        @Parameter(names = "-ba", description = "alpha^B.", required=true)
         public double bAlpha = -1;
 
-        @Parameter(names = "-b", description = "Beta.", required=true)
+        @Parameter(names = "-b", description = "beta.", required=true)
         public double beta = -1;
 
-        @Parameter(names = "-g", description = "Gamma.", required=true)
-        public double gamma = -1;
+        @Parameter(names = "-sg", description = "gamma^S.", required=true)
+        public double sGamma = -1;
 
-        @Parameter(names = "-k", description = "Kappa.", required=true)
-        public double kappa = -1;
+        @Parameter(names = "-ag", description = "gamma^A.", required=true)
+        public double aGamma = -1;
 
-        @Parameter(names = "-n", description = "Nu.", required=true)
+        @Parameter(names = "-n", description = "nu.")
         public double nu = -1;
 
-        @Parameter(names = "-e", description = "Eta.", required=true)
+        @Parameter(names = "-e", description = "eta.")
         public double eta = -1;
 
         @Parameter(names = "-d", description = "Input directory.", required=true)
@@ -232,6 +233,9 @@ public class CSM implements Callable<Void> {
         }
         useDomain = params.useDomain;
         useMultiLevel = !params.seq;
+        nuIsNotGiven = (params.nu == -1 ? true : false);
+        etaIsNotGiven = (params.eta == -1 ? true : false);
+        
         numThreads = params.numThreads;
         if (numThreads > 1) useBatchParamUpdate = true;
         else useBatchParamUpdate = false;
@@ -245,8 +249,8 @@ public class CSM implements Callable<Void> {
         fAlpha = params.fAlpha;
         bAlpha = params.bAlpha;
         beta = params.beta;
-        gamma = params.gamma;
-        kappa = params.kappa;
+        sGamma = params.sGamma;
+        aGamma = params.aGamma;
         eta = params.eta;
         nu = params.nu;
         inDir = params.inDir;
@@ -259,13 +263,11 @@ public class CSM implements Callable<Void> {
 
         // Validity
         if (!new File(inDir).exists()) throw new Exception("There's no input directory " + inDir);
-        if (fAlpha <= 0) throw new Exception("FAlpha must be specified as a positive real number.");
-        if (bAlpha <= 0) throw new Exception("BAlpha must be specified as a positive real number.");
-        if (beta <= 0) throw new Exception("Beta must be specified as a positive real number.");
-        if (gamma <= 0) throw new Exception("Gamma must be specified as a positive real number.");
-        if (kappa <= 0) throw new Exception("Kappa must be specified as a positive real number.");
-        if (eta < 0 || eta > 1) throw new Exception("Eta must range between [0,1].");
-        if (nu < 0 || nu > 1) throw new Exception("Nu must range between [0,1].");
+        if (fAlpha <= 0) throw new Exception("alpha^F must be specified as a positive real number.");
+        if (bAlpha <= 0) throw new Exception("alpha^B must be specified as a positive real number.");
+        if (beta <= 0) throw new Exception("beta must be specified as a positive real number.");
+        if (sGamma <= 0) throw new Exception("gamma^S must be specified as a positive real number.");
+        if (aGamma <= 0) throw new Exception("gamma^A must be specified as a positive real number.");
         if (numBTopics <= 0 && !useDomain) throw new Exception("Either the number of BTs should "
                                     + " be specified or the domain information should be used.");
         if (numBTopics > 0 && useDomain) System.err.println("Warning: the argument -bt is ignored "
@@ -310,15 +312,17 @@ public class CSM implements Callable<Void> {
      * Prints the model configuration.
      */
     public static void printConfiguration() {
-        System.out.println("Threads: "+numThreads);
-        System.out.println("Use batch param update: "+useBatchParamUpdate);
-        System.out.println("Use multi-level: "+useMultiLevel);
-        System.out.println("Use domains: "+useDomain);
-        System.out.println("Domains: "+numBTopics);
-        System.out.println("Foreground topics: "+numFTopics);
-        System.out.println("Words: "+numWords);
-        System.out.println("Seqs: "+seqs.size());
-        System.out.println("Min seq len: "+minSeqLen);
+        System.out.println("Threads: " + numThreads);
+        System.out.println("Use batch param update: " + useBatchParamUpdate);
+        System.out.println("Use multi-level: " + useMultiLevel);
+        System.out.println("Use domains: " + useDomain);
+        System.out.println("Update nu: " + nuIsNotGiven);
+        System.out.println("Update eta: " + etaIsNotGiven);
+        System.out.println("Domains: " + numBTopics);
+        System.out.println("Foreground topics: " + numFTopics);
+        System.out.println("Words: " + numWords);
+        System.out.println("Seqs: " + seqs.size());
+        System.out.println("Min seq len: " + minSeqLen);
     }
     
     /**
@@ -360,6 +364,7 @@ public class CSM implements Callable<Void> {
             V_BW.commit();
             V_SF.commit();
             V_B.commit();
+            
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
@@ -393,11 +398,16 @@ public class CSM implements Callable<Void> {
             }
             executor.invokeAll(tasks);
             
+            // Update nu and eta
+            if (updateParams && nuIsNotGiven) sampleNu();
+            if (updateParams && etaIsNotGiven) sampleEta();
+
             Duration runTime = Duration.between(startTime, LocalDateTime.now());
             Duration remainTime = runTime.multipliedBy(numIters - iter - 1);
             System.out.println(String.format(" took %.3fs. (Remain: %dH %2dM %2dS)",
                                 runTime.toMillis()/1000.0, remainTime.toHours(), 
                                 remainTime.toMinutes()%60, remainTime.getSeconds()%60));
+            System.out.println("Nu: " + nu + ", Eta: " + eta);
 
             if (numLogIters > 0 && (iter+1) % numLogIters == 0) {
                 double ll = logLikelihood();
@@ -425,10 +435,10 @@ public class CSM implements Callable<Void> {
                     + "-FA" + fAlpha
                     + "-BA" + bAlpha
                     + "-B" + beta
-                    + "-G" + gamma
-                    + "-K" + kappa
-                    + "-E" + eta
-                    + "-N" + nu
+                    + "-G" + sGamma
+                    + "-K" + aGamma
+                    + (!etaIsNotGiven ? "-E" + eta : "")
+                    + (!nuIsNotGiven ? "-N" + nu : "")
                     + (useDomain ? "-DOM" : "")
                     + (!useMultiLevel ? "-SEQ" : "");
         if (outDir == null) outDir = inDir+"/"+outPrefix;
@@ -611,6 +621,8 @@ public class CSM implements Callable<Void> {
      * Initializes all parameters and variables.
      */
     public static void initialize() throws Exception {
+        Random random = new Random();
+
         if (updateParams) {
             N_SS = new DoubleMatrix(numStates, numStates);
             N_0S = new DoubleMatrix(1, numStates);
@@ -618,6 +630,9 @@ public class CSM implements Callable<Void> {
             N_BW = new DoubleMatrix(numBTopics, numWords);
             N_SF = new DoubleMatrix(numStates, numFTopics);
             N_B = new DoubleMatrix(1, numBTopics);
+            
+            if (nuIsNotGiven) nu = random.nextDouble();
+            if (etaIsNotGiven) eta = random.nextDouble();
         } else {
             restoreModel();
         }
@@ -629,12 +644,11 @@ public class CSM implements Callable<Void> {
         sumFAlpha = numFTopics * fAlpha;
         sumBAlpha = numBTopics * bAlpha;
         sumBeta = numWords * beta;
-        sumGamma = numStates * gamma;
-        sumKappa = numStates * kappa;
+        sumSGamma = numStates * sGamma;
+        sumAGamma = numStates * aGamma;
 
 
-        // Random initialization
-        Random random = new Random();
+        // Initialize instances
         for (String seqId : seqs.keySet()) {
             Sequence seq = seqs.get(seqId);
             if (useDomain) {
@@ -901,25 +915,25 @@ public class CSM implements Callable<Void> {
 
                     // p(s | s_prev, a)
                     if (inst.parent == null) {  // Root post
-                        probs[s] += Math.log(nu * (V_0S.getValue(0,s) + gamma) 
-                                                / (V_0S.getRowSum(0) + sumGamma)
-                                    + (1-nu) * (N_AS.getValue(inst.author,s) + kappa) 
-                                                / (N_AS.getRowSum(inst.author) + sumKappa));
+                        probs[s] += Math.log(nu * (V_0S.getValue(0,s) + sGamma) 
+                                                / (V_0S.getRowSum(0) + sumSGamma)
+                                    + (1-nu) * (N_AS.getValue(inst.author,s) + aGamma) 
+                                                / (N_AS.getRowSum(inst.author) + sumAGamma));
                     } else {
-                        probs[s] += Math.log(nu * (V_SS.getValue(inst.parent.state, s) + gamma) 
-                                                / (V_SS.getRowSum(inst.parent.state) + sumGamma)
-                                    + (1-nu) * (N_AS.getValue(inst.author,s) + kappa) 
-                                                / (N_AS.getRowSum(inst.author) + sumKappa));
+                        probs[s] += Math.log(nu * (V_SS.getValue(inst.parent.state, s) + sGamma) 
+                                                / (V_SS.getRowSum(inst.parent.state) + sumSGamma)
+                                    + (1-nu) * (N_AS.getValue(inst.author,s) + aGamma) 
+                                                / (N_AS.getRowSum(inst.author) + sumAGamma));
                         if (updateParams) V_SS.incValue(inst.parent.state, s);
                     }
                     N_AS.incValue(inst.author, s);
 
                     // p(s_next | s, a_next)
                     for (Instance nextInst : inst.children) {
-                        probs[s] += Math.log(nu * (V_SS.getValue(s, nextInst.state) + gamma) 
-                                                / (V_SS.getRowSum(s) + sumGamma)
-                                    + (1-nu) * (N_AS.getValue(nextInst.author, nextInst.state) + kappa)
-                                                / (N_AS.getRowSum(nextInst.author) + sumKappa));
+                        probs[s] += Math.log(nu * (V_SS.getValue(s, nextInst.state) + sGamma) 
+                                                / (V_SS.getRowSum(s) + sumSGamma)
+                                    + (1-nu) * (N_AS.getValue(nextInst.author, nextInst.state) + aGamma)
+                                                / (N_AS.getRowSum(nextInst.author) + sumAGamma));
                         if (updateParams) V_SS.incValue(s, nextInst.state);
                     }
 
@@ -954,6 +968,95 @@ public class CSM implements Callable<Void> {
                 }
             }
         }
+    }
+    
+    /**
+     * Samples nu.
+     */
+    public static void sampleNu() {
+        // PDF = P(all transitions between states)
+        nu = sliceSampling((x) -> {
+            double logP = 0;
+            for (String seqKey : seqs.keySet()) {
+                DoubleMatrix N_AS = N_QAS.get(seqKey);
+                Sequence seq = seqs.get(seqKey);
+                for (Instance inst : seq.instances.values()) {
+                    int author = inst.author;
+                    int state = inst.state;
+                    if (inst.parent == null) {
+                        logP += Math.log(x * (N_0S.getValue(0, state) + sGamma) / (N_0S.getRowSum(0) + sumSGamma)
+                                + (1 - x) * (N_AS.getValue(author, state) + aGamma) / (N_AS.getRowSum(author) + sumAGamma));
+                    } else {
+                        logP += Math.log(x * (N_SS.getValue(inst.parent.state, state) + sGamma) / (N_SS.getRowSum(inst.parent.state) + sumSGamma)
+                                + (1 - x) * (N_AS.getValue(author, state) + aGamma) / (N_AS.getRowSum(author) + sumAGamma));    
+                    }
+                }
+            }
+            return logP;
+        });
+    }
+    
+    /**
+     * Samples eta.
+     */
+    public static void sampleEta() {
+        // Count observations
+        int[] levelCnt = new int[2];
+        for (Sequence seq : seqs.values()) {
+            for (Instance inst : seq.instances.values()) {
+                for (Sentence sentence : inst.sentences) {
+                    for (Word word : sentence.words) {
+                        levelCnt[word.level]++;
+                    }
+                }
+            }
+        }
+        
+        // PDF = Binomial(observation 1, observation 2, p(observation 1))
+        eta = sliceSampling((x) -> levelCnt[1] * Math.log(x) + levelCnt[0] * Math.log(1 - x));
+    }
+
+    
+    /**
+     * Runs slice sampling and returns one sample.
+     * 
+     * @param logP the PDF of the distribution from which a sample is drawn.
+     * @return one sample.
+     */
+    public static double sliceSampling(DoubleFunction<Double> logP) {
+        double stepSize = 0.05;
+        int numSliceSampling = 100;
+        
+        Random random = new Random();
+        int[] hist = new int[10];  // Histogram of samples
+        double[] newXs = new double[numSliceSampling];
+        for (int i = 0; i < numSliceSampling; i++) {
+            double x;
+            if (i == 0) x = eta;
+            else x = newXs[i-1];
+            
+            double logY = logP.apply(x);
+            double newLogY = logY + Math.log(random.nextDouble());
+            
+            double cut = stepSize * random.nextDouble();
+            double start = Math.max(x - cut, 0);
+            double end = Math.min(x - cut + stepSize, 1);
+            while (start > 0 && logP.apply(start) > newLogY) {
+                start = Math.max(start - stepSize, 0);
+            }
+            while (end < 1 && logP.apply(end) > newLogY) {
+                end = Math.min(end + stepSize, 1);
+            }
+       
+            while (true) {
+                newXs[i] = start + (end - start) * random.nextDouble();
+                if (logP.apply(newXs[i]) >= newLogY) break;
+                if (newXs[i] < x) start = newXs[i];
+                else end = newXs[i];
+            }
+            hist[(int)(newXs[i] / 0.1)]++;
+        }
+        return newXs[random.nextInt(numSliceSampling)];
     }
 
     /**
@@ -1002,13 +1105,13 @@ public class CSM implements Callable<Void> {
 
         outPiS.print("Init");
         for (int s2 = 0; s2 < numStates; s2++)
-            outPiS.print((N_0S.getValue(0, s2) + gamma) / (N_0S.getRowSum(0) + sumGamma));
+            outPiS.print((N_0S.getValue(0, s2) + sGamma) / (N_0S.getRowSum(0) + sumSGamma));
         outPiS.println();
 
         for (int s1 = 0; s1 < numStates; s1++) {
             outPiS.print("S"+s1);
             for (int s2 = 0; s2 < numStates; s2++) {
-                outPiS.print((N_SS.getValue(s1, s2) + gamma) / (N_SS.getRowSum(s1) + sumGamma));
+                outPiS.print((N_SS.getValue(s1, s2) + sGamma) / (N_SS.getRowSum(s1) + sumSGamma));
             }
             outPiS.println();
         }
@@ -1180,7 +1283,7 @@ public class CSM implements Callable<Void> {
                 outPiA.print(seqKey);
                 outPiA.print(seqAuthorList.get(seqKey).get(a));
                 for (int s = 0; s < numStates; s++) {
-                    outPiA.print((N_AS.getValue(a,s)+kappa) / (N_AS.getRowSum(a)+sumKappa));
+                    outPiA.print((N_AS.getValue(a,s)+aGamma) / (N_AS.getRowSum(a)+sumAGamma));
                 }
                 outPiA.println();
             }
@@ -1278,15 +1381,15 @@ public class CSM implements Callable<Void> {
     public static double logLikelihood() {
         DoubleMatrix P_SS = N_SS.copy();
         for (int r = 0; r < P_SS.getNumRows(); r++) {
-            double denom = P_SS.getRowSum(r) + (numStates)*gamma;
+            double denom = P_SS.getRowSum(r) + (numStates)*sGamma;
             for (int c = 0; c < P_SS.getNumColumns(); c++)
-                P_SS.setValue(r,c, (P_SS.getValue(r,c)+gamma) / denom);
+                P_SS.setValue(r,c, (P_SS.getValue(r,c)+sGamma) / denom);
         }
         DoubleMatrix P_0S = N_0S.copy();
         for (int r = 0; r < P_0S.getNumRows(); r++) {
-            double denom = P_0S.getRowSum(r) + numStates*gamma;
+            double denom = P_0S.getRowSum(r) + numStates*sGamma;
             for (int c = 0; c < P_0S.getNumColumns(); c++)
-                P_0S.setValue(r,c, (P_0S.getValue(r,c)+gamma) / denom);
+                P_0S.setValue(r,c, (P_0S.getValue(r,c)+sGamma) / denom);
         }
         DoubleMatrix P_FW = N_FW.copy();
         for (int r = 0; r < P_FW.getNumRows(); r++) {
@@ -1318,9 +1421,9 @@ public class CSM implements Callable<Void> {
         for (String seqId : seqs.keySet()) {
             DoubleMatrix P_AS = N_QAS.get(seqId).copy();
             for (int r = 0; r < P_AS.getNumRows(); r++) {
-                double denom = P_AS.getRowSum(r) + sumKappa;
+                double denom = P_AS.getRowSum(r) + sumAGamma;
                 for (int c = 0; c < numStates; c++)
-                    P_AS.setValue(r,c, (P_AS.getValue(r,c)+kappa) / denom);
+                    P_AS.setValue(r,c, (P_AS.getValue(r,c)+aGamma) / denom);
             }
 
             Sequence seqVal = seqs.get(seqId);
@@ -1399,6 +1502,17 @@ public class CSM implements Callable<Void> {
             N_AS.saveToCsvFile(outPrefix+"-N_AS/"+String.format("%06d", seqIdx)+".csv");
             seqIdx++;
         }
+        
+        if (nuIsNotGiven) {
+            PrintFileWriter out = new PrintFileWriter(outPrefix + "-Nu.txt");
+            out.println(nu);
+            out.close();
+        }
+        if (etaIsNotGiven) {
+            PrintFileWriter out = new PrintFileWriter(outPrefix + "-Eta.txt");
+            out.println(eta);
+            out.close();
+        }
     }
 
     /**
@@ -1411,6 +1525,17 @@ public class CSM implements Callable<Void> {
         N_BW = DoubleMatrix.loadFromCsvFile(modelPathPrefix+"-N_BW.csv");
         N_SF = DoubleMatrix.loadFromCsvFile(modelPathPrefix+"-N_SF.csv");
         N_B = DoubleMatrix.loadFromCsvFile(modelPathPrefix+"-N_B.csv");
+        
+        if (nuIsNotGiven) {
+            BufferedFileReader in = new BufferedFileReader(modelPathPrefix + "-Nu.txt");
+            nu = Double.valueOf(in.readLine());
+            in.close();
+        }
+        if (etaIsNotGiven) {   
+            BufferedFileReader in = new BufferedFileReader(modelPathPrefix + "-Eta.txt");
+            eta = Double.valueOf(in.readLine());
+            in.close();
+        }
     }
     
     /**
