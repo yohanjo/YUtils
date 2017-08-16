@@ -12,15 +12,16 @@ An input data file should be a CSV file, where each line represents an utterance
  * `Text`: the text of the utterance. If text is pre-tokenized, the tokens must be separated by spaces, and sentences by `<SENT>`. For example, the sentence `I'm a student. You're a teacher.` may be represented as `I 'm a student . <SENT> You 're a teacher .`. If text is not pre-tokenized and the model is given the `-tok` option, the model will automatically conduct sentence segmentation and tokenization.
  * `Parent` (optional): the `InstNo` of the parent of the utterance. This column is ignored if the model is given the `-seq` option.
  * `Domain` (optional): the domain of the utterance. This column must be present if the model is given the `-domain` option.
+ * `Label` (optional): the true label (dialogue act) of the utterance. If `Label` exists, the output `InstAssign` file has the `Label` column filled.
 
 
 ## Command Examples
 
 Training:
-`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2`
+`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -ag 0.1 -sg 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2`
 
 Fitting:
-`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -k 0.1 -g 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-G1.0-K0.1-E0.8-N0.9-SEQ-I1000`
+`-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -ag 0.1 -sg 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-SG1.0-AG0.1-E0.8-N0.9-SEQ/I1000`
 
 
 ## Tips
