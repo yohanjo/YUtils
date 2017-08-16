@@ -453,7 +453,7 @@ public class CSM implements Callable<Void> {
                 genOutFiles(iter+1);
             } else if (sampleInterval > 0 && iter+1 > burnIters && 
                     (iter+1-burnIters) % sampleInterval == 0) {
-                printInstAssign(iter);
+                printInstAssign(iter+1);
             }
         }
         executor.shutdownNow();
