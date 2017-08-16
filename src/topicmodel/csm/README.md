@@ -21,17 +21,25 @@ An input data file should be a CSV file, where each line represents an utterance
 A new model is trained based on the given input data.
 
 ```
--s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -ag 0.1 -sg 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq -d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2
+-s 5 -ft 10 -bt 10 -fa 0.1 -ba 1 -b 0.001 -ag 0.1 -sg 1 -e 0.8 -n 0.9 -mw 1 -ms 1 -seq 
+-d data_dir -data data_train.csv -i 1000 -to 100 -log 100 -th 2
 ```
 
 ### Fitting
 A trained model is fitted to the given input data, without parameter updates. This mode may be used to estimate the states of new data. A configuration passed along as input arguments is ignored, as the code automatically parses the configuration from the model path.
 
-`-d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-SG1.0-AG0.1-E0.8-N0.9-SEQ/I1000`
+```
+-d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 
+-model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-SG1.0-AG0.1-E0.8-N0.9-SEQ/I1000
+```
 
 You can also generate multiple samples of state assignment every `sample` iterations after `burn` iterations (rather than just after the last iteration).
 
-`-d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 -model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-SG1.0-AG0.1-E0.8-N0.9-SEQ/I1000 -burn 800 -sample 20`
+```
+-d data_dir -data data_test.csv -i 1000 -to 100 -log 100 -th 2 
+-model models/CSM-data_train-S5-FT10-BT10-FA0.1-BA1.0-B0.001-SG1.0-AG0.1-E0.8-N0.9-SEQ/I1000 
+-burn 800 -sample 20
+```
 
 
 ## Tips
