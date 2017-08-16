@@ -24,6 +24,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.DoubleFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 import org.apache.commons.csv.CSVFormat;
@@ -55,19 +57,21 @@ public class CSM implements Callable<Void> {
     static boolean updateParams;  // Update parameters?
     static boolean nuIsNotGiven;  // nu is not given?
     static boolean etaIsNotGiven;  // eta is not given?
-    static boolean useBackground;  // Use pre-trained background?
     static boolean useDomain;  // Use the true domain information?
     static boolean useMultiLevel;  // Use the multi-level structure?
     static boolean tokenization;
+    
     static int numIters;  // Num of training iterations
     static int numTmpIters;  // Num of iterations for temporary output files
     static int numLogIters;  // Num of iterations for computing log-likelihood
+    static int burnIters;   // Num of iterations for burn-in for inference
+    static int sampleInterval;  // Sampling interval
+    
     static int numProbWords;  // Num of top words to display in the ProbWords file
     static String inDir=null;  // Input data directory
     static String outDir=null;  // Output directory
     static String dataFileName = null;  // Data file name (e.g., data.csv)
     static String modelPathPrefix = null;  // Trained model
-    static String backgroundPathPrefix = null;  // Trained background
     static String outPrefix = null;  // Prefix of the names of output files
 
     static DoubleMatrix N_SS;  // State x state transition counts
@@ -124,10 +128,10 @@ public class CSM implements Callable<Void> {
 
     // Command arguments
     public static class Parameters {
-        @Parameter(names = "-s", description = "Number of states.", required=true)
+        @Parameter(names = "-s", description = "Number of states.")
         public int numStates = -1;
 
-        @Parameter(names = "-ft", description = "Number of foreground topics.", required=true)
+        @Parameter(names = "-ft", description = "Number of foreground topics.")
         public int numFTopics = -1;
 
         @Parameter(names = "-bt", description = "Number of background topics.")
@@ -142,23 +146,29 @@ public class CSM implements Callable<Void> {
         @Parameter(names = "-log", description = "Number of iterations for calculating "
                                                                     + " log-likelihood.")
         public int numLogIters = -1;
+        
+        @Parameter(names = "-burn", description = "Number of iterations for burn-in.")
+        public int burnIters = 0;
+        
+        @Parameter(names = "-sample", description = "Sampling interval.")
+        public int sampleInterval = -1;
 
         @Parameter(names = "-pw", description = "Number of top words to display.")
         public int numProbWords = 100;
 
-        @Parameter(names = "-fa", description = "alpha^F.", required=true)
+        @Parameter(names = "-fa", description = "alpha^F.")
         public double fAlpha = -1;
 
-        @Parameter(names = "-ba", description = "alpha^B.", required=true)
+        @Parameter(names = "-ba", description = "alpha^B.")
         public double bAlpha = -1;
 
-        @Parameter(names = "-b", description = "beta.", required=true)
+        @Parameter(names = "-b", description = "beta.")
         public double beta = -1;
 
-        @Parameter(names = "-sg", description = "gamma^S.", required=true)
+        @Parameter(names = "-sg", description = "gamma^S.")
         public double sGamma = -1;
 
-        @Parameter(names = "-ag", description = "gamma^A.", required=true)
+        @Parameter(names = "-ag", description = "gamma^A.")
         public double aGamma = -1;
 
         @Parameter(names = "-n", description = "nu.")
@@ -196,9 +206,6 @@ public class CSM implements Callable<Void> {
         @Parameter(names = "-model", description = "Trained model to fit (no parameter update).")
         public String model = null;
 
-        @Parameter(names = "-background", description = "Trained background topics.")
-        public String background = null;
-        
         @Parameter(names = "-domain", description = "Use the domain information.")
         public boolean useDomain;
 
@@ -225,16 +232,6 @@ public class CSM implements Callable<Void> {
         } else {
             updateParams = true;
         }
-        if (params.background != null) {
-            useBackground = true;
-            backgroundPathPrefix = params.background;
-        } else {
-            useBackground = false;
-        }
-        useDomain = params.useDomain;
-        useMultiLevel = !params.seq;
-        nuIsNotGiven = (params.nu == -1 ? true : false);
-        etaIsNotGiven = (params.eta == -1 ? true : false);
         
         numThreads = params.numThreads;
         if (numThreads > 1) useBatchParamUpdate = true;
@@ -245,7 +242,21 @@ public class CSM implements Callable<Void> {
         numIters = params.numIters;
         numTmpIters = params.numTmpIters;
         numLogIters = params.numLogIters;
+        burnIters = params.burnIters;
+        sampleInterval = params.sampleInterval;
         numProbWords = params.numProbWords;
+        
+        inDir = params.inDir;
+        outDir = params.outDir;
+        dataFileName = params.dataFileName;
+
+        minNumWords = params.minNumWords;
+        tokenization = params.tokenize;
+        
+        useDomain = params.useDomain;
+        useMultiLevel = !params.seq;
+        minSeqLen = params.minSeqLen;
+        
         fAlpha = params.fAlpha;
         bAlpha = params.bAlpha;
         beta = params.beta;
@@ -253,14 +264,35 @@ public class CSM implements Callable<Void> {
         aGamma = params.aGamma;
         eta = params.eta;
         nu = params.nu;
-        inDir = params.inDir;
-        outDir = params.outDir;
-        dataFileName = params.dataFileName;
-
-        minNumWords = params.minNumWords;
-        minSeqLen = params.minSeqLen;
-        tokenization = params.tokenize;
-
+        
+        if (modelPathPrefix != null) {
+            for (String argToken : modelPathPrefix.split("-|/")) {
+                Matcher m = Pattern.compile("^(.*?)([\\d.]*)$").matcher(argToken);
+                if (!m.find()) continue;
+                String arg = m.group(1);
+                String val = m.group(2);
+                
+                if (arg.equals("S")) numStates = Integer.valueOf(val);
+                else if (arg.equals("FT")) numFTopics = Integer.valueOf(val);
+                else if (arg.equals("BT")) numBTopics = Integer.valueOf(val);
+                else if (arg.equals("FA")) fAlpha = Double.valueOf(val);
+                else if (arg.equals("BA")) bAlpha = Double.valueOf(val);
+                else if (arg.equals("B")) beta = Double.valueOf(val);
+                else if (arg.equals("SG")) sGamma = Double.valueOf(val);
+                else if (arg.equals("AG")) aGamma = Double.valueOf(val);
+                else if (arg.equals("E")) eta = Double.valueOf(val);
+                else if (arg.equals("N")) nu = Double.valueOf(val);
+                else if (arg.equals("MS")) minSeqLen = Integer.valueOf(val);
+                else if (arg.equals("DOM")) useDomain = true;
+                else if (arg.equals("SEQ")) useMultiLevel = false;
+            }
+        }
+        
+        
+        nuIsNotGiven = (nu == -1 ? true : false);
+        etaIsNotGiven = (eta == -1 ? true : false);
+        
+        
         // Validity
         if (!new File(inDir).exists()) throw new Exception("There's no input directory " + inDir);
         if (fAlpha <= 0) throw new Exception("alpha^F must be specified as a positive real number.");
@@ -316,8 +348,8 @@ public class CSM implements Callable<Void> {
         System.out.println("Use batch param update: " + useBatchParamUpdate);
         System.out.println("Use multi-level: " + useMultiLevel);
         System.out.println("Use domains: " + useDomain);
-        System.out.println("Update nu: " + nuIsNotGiven);
-        System.out.println("Update eta: " + etaIsNotGiven);
+        System.out.println("Nu is given: " + !nuIsNotGiven);
+        System.out.println("Eta is given: " + !etaIsNotGiven);
         System.out.println("Domains: " + numBTopics);
         System.out.println("Foreground topics: " + numFTopics);
         System.out.println("Words: " + numWords);
@@ -417,6 +449,9 @@ public class CSM implements Callable<Void> {
             if (iter+1 == numIters || (numTmpIters > 0 && (iter+1) % numTmpIters == 0)) {
                 System.out.println("  - Generating output files...");
                 genOutFiles(iter+1);
+            } else if (sampleInterval > 0 && iter+1 > burnIters && 
+                    (iter+1-burnIters) % sampleInterval == 0) {
+                printInstAssign(iter);
             }
         }
         executor.shutdownNow();
@@ -435,8 +470,8 @@ public class CSM implements Callable<Void> {
                     + "-FA" + fAlpha
                     + "-BA" + bAlpha
                     + "-B" + beta
-                    + "-G" + sGamma
-                    + "-K" + aGamma
+                    + "-SG" + sGamma
+                    + "-AG" + aGamma
                     + (!etaIsNotGiven ? "-E" + eta : "")
                     + (!nuIsNotGiven ? "-N" + nu : "")
                     + (useDomain ? "-DOM" : "")
@@ -486,6 +521,7 @@ public class CSM implements Callable<Void> {
 
             RawInstance inst = new RawInstance();
 
+            inst.label = record.get("Label");
             inst.text = record.get("Text");
             if (tokenization) {
                 inst.text = inst.text.replaceAll("https?://\\S+", "URLURL");
@@ -1094,11 +1130,12 @@ public class CSM implements Callable<Void> {
      * @param iter the iteration number of the results to be output.
      */
     public static void genOutFiles(int iter) throws Exception {
-        saveModel(outDir, outPrefix+"-I"+iter);
+        String outPathPrefix = outDir + "/I" + iter;
+        saveModel(outPathPrefix);
         
         // Pi-State
         CSVPrinter outPiS = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-PiS.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-PiS.csv"), CSVFormat.EXCEL);
         outPiS.print("");
         for (int s = 0; s < numStates; s++) outPiS.print("S"+s);
         outPiS.println();
@@ -1122,7 +1159,7 @@ public class CSM implements Callable<Void> {
 
         // ThetaF
         CSVPrinter outFTheta = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-ThetaF.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-ThetaF.csv"), CSVFormat.EXCEL);
         outFTheta.print("");
         for (int t = 0; t < numFTopics; t++) outFTheta.print("FT"+t);
         outFTheta.println();
@@ -1138,7 +1175,7 @@ public class CSM implements Callable<Void> {
 
         // ThetaB
         CSVPrinter outBTheta = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-ThetaB.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-ThetaB.csv"), CSVFormat.EXCEL);
         for (int t = 0; t < numBTopics; t++) outBTheta.print("BT"+t);
         outBTheta.println();
 
@@ -1152,7 +1189,7 @@ public class CSM implements Callable<Void> {
 
         // DThetaF
         CSVPrinter outDThetaF = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-DThetaF.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-DThetaF.csv"), CSVFormat.EXCEL);
         outDThetaF.print("SeqId");
         outDThetaF.print("InstNo");
         for (int t = 0; t < numFTopics; t++) outDThetaF.print("FT"+t);
@@ -1184,7 +1221,7 @@ public class CSM implements Callable<Void> {
 
         // PhiF
         CSVPrinter outPhiF = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-PhiF.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-PhiF.csv"), CSVFormat.EXCEL);
         outPhiF.print("");
         for (int t = 0; t < numFTopics; t++) outPhiF.print("FT"+t);
         outPhiF.println();
@@ -1201,7 +1238,7 @@ public class CSM implements Callable<Void> {
 
         // PhiB
         CSVPrinter outPhiB = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-PhiB.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-PhiB.csv"), CSVFormat.EXCEL);
         outPhiB.print("");
         if (useDomain) { 
             for (int t = 0; t < numBTopics; t++) 
@@ -1224,7 +1261,7 @@ public class CSM implements Callable<Void> {
 
         // Top words for each foreground topic
         CSVPrinter outProbWordsF = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-ProbWordsF.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-ProbWordsF.csv"), CSVFormat.EXCEL);
         for (int t = 0; t < numFTopics; t++) outProbWordsF.print("FT"+t);
         outProbWordsF.println();
 
@@ -1244,7 +1281,7 @@ public class CSM implements Callable<Void> {
 
         // Top words for each background topic
         CSVPrinter outProbWordsB = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-ProbWordsB.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-ProbWordsB.csv"), CSVFormat.EXCEL);
         if (useDomain) { 
             for (int t = 0; t < numBTopics; t++) 
                 outProbWordsB.print(domainList.get(t)); 
@@ -1270,7 +1307,7 @@ public class CSM implements Callable<Void> {
 
         // Pi-Author
         CSVPrinter outPiA = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-PiA.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-PiA.csv"), CSVFormat.EXCEL);
         outPiA.print("SeqId");
         outPiA.print("Author");
         for (int s = 0; s < numStates; s++) outPiA.print("S"+s);
@@ -1293,42 +1330,12 @@ public class CSM implements Callable<Void> {
 
 
         // Instance-state/BT assignment
-        CSVPrinter outInstAssign = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-InstAssign.csv"), CSVFormat.EXCEL);
-        outInstAssign.printRecord("SeqId", "InstNo", "Author", "Text", "TaggedText", 
-                                                                "State", "BTopic");
-
-        for (String seqKey : rawSeqs.keySet()) {
-            TreeMap<Integer, RawInstance> rawSeq = rawSeqs.get(seqKey);
-            Sequence seqVal = seqs.get(seqKey);
-            for (int instNo : rawSeq.keySet()) {
-                Instance inst = null;
-                if (seqVal != null) inst = seqVal.instances.get(instNo);
-                if (inst != null) {
-                    StringBuffer taggedText = new StringBuffer();
-                    for (Sentence sentence : inst.sentences) {
-                        for (Word word : sentence.words) {
-                            if (word.level==1) taggedText.append(
-                                    "F"+sentence.fTopic+":" + wordList.get(word.id) + " ");
-                            else taggedText.append(
-                                    "B"+seqVal.bTopic+":" + wordList.get(word.id) + " ");
-                        }
-                    }
-                    outInstAssign.printRecord(seqKey, instNo, rawSeq.get(instNo).author, 
-                            rawSeq.get(instNo).text, taggedText.toString().trim(), inst.state, 
-                            seqVal.bTopic+(useDomain ? " ("+domainList.get(seqVal.bTopic)+")" : ""));
-                }
-                else outInstAssign.printRecord(seqKey, instNo, 
-                        rawSeq.get(instNo).author, rawSeq.get(instNo).text, "", "", "");
-            }
-        }
-        outInstAssign.flush();
-        outInstAssign.close();
+        printInstAssign(iter);
 
 
         // Instance(sentence)-state assignment
         CSVPrinter outSentAssign = new CSVPrinter(new PrintFileWriter(
-                outDir+"/"+outPrefix+"-I"+iter+"-InstSentAssign.csv"), CSVFormat.EXCEL);
+                outPathPrefix+"-InstSentAssign.csv"), CSVFormat.EXCEL);
         outSentAssign.printRecord("SeqId", "InstNo", "Author", "Sentence", "TaggedText", "State", 
                                                                             "FTopic", "BTopic");
 
@@ -1363,7 +1370,7 @@ public class CSM implements Callable<Void> {
         // Log-likelihood
         if (logL.size() > 0) {
             CSVPrinter outLogL = new CSVPrinter(new PrintFileWriter(
-                    outDir+"/"+outPrefix+"-I"+iter+"-LogL.csv"), CSVFormat.EXCEL);
+                    outPathPrefix+"-LogL.csv"), CSVFormat.EXCEL);
             outLogL.printRecord("Iter","LogL");
             for (Map.Entry<Integer,Double> entry : logL.entrySet()) {
                 outLogL.printRecord(entry.getKey(), entry.getValue());
@@ -1371,6 +1378,47 @@ public class CSM implements Callable<Void> {
             outLogL.flush();
             outLogL.close();
         }
+    }
+    
+    
+    public static void printInstAssign(int iter) throws Exception {
+        String outPathPrefix = outDir + "/I" + iter;
+        
+        CSVPrinter outInstAssign = new CSVPrinter(new PrintFileWriter(
+                outPathPrefix+"-InstAssign.csv"), CSVFormat.EXCEL);
+        outInstAssign.printRecord("SeqId", "InstNo", "Author", "Label", 
+                                  "Text", "TaggedText", "State", "BTopic");
+
+        for (String seqKey : rawSeqs.keySet()) {
+            TreeMap<Integer, RawInstance> rawSeq = rawSeqs.get(seqKey);
+            Sequence seqVal = seqs.get(seqKey);
+            for (int instNo : rawSeq.keySet()) {
+                Instance inst = null;
+                if (seqVal != null) inst = seqVal.instances.get(instNo);
+                if (inst != null) {
+                    StringBuffer taggedText = new StringBuffer();
+                    for (Sentence sentence : inst.sentences) {
+                        for (Word word : sentence.words) {
+                            if (word.level==1) 
+                                taggedText.append(
+                                    "F"+sentence.fTopic+":" + wordList.get(word.id) + " ");
+                            else 
+                                taggedText.append(
+                                    "B"+seqVal.bTopic+":" + wordList.get(word.id) + " ");
+                        }
+                    }
+                    outInstAssign.printRecord(seqKey, instNo, rawSeq.get(instNo).author, 
+                            rawSeq.get(instNo).label, rawSeq.get(instNo).text, 
+                            taggedText.toString().trim(), inst.state, 
+                            seqVal.bTopic+(useDomain ? " ("+domainList.get(seqVal.bTopic)+")" : ""));
+                } else { 
+                    outInstAssign.printRecord(seqKey, instNo, rawSeq.get(instNo).author, 
+                            rawSeq.get(instNo).label, rawSeq.get(instNo).text, "", "", "");
+                }
+            }
+        }
+        outInstAssign.flush();
+        outInstAssign.close();
     }
 
     /**
@@ -1466,7 +1514,7 @@ public class CSM implements Callable<Void> {
      */  
     public static void saveWords() throws Exception {
         CSVPrinter outWordCount = new CSVPrinter(
-                new PrintFileWriter(outDir+"/"+outPrefix+"-WordCount.csv"), CSVFormat.EXCEL);
+                new PrintFileWriter(outDir+"/WordCount.csv"), CSVFormat.EXCEL);
         outWordCount.printRecord("Word","Count");
         for (String word : wordList)
             outWordCount.printRecord(word, wordCnt.get(word));
@@ -1478,7 +1526,7 @@ public class CSM implements Callable<Void> {
      * Saves {@link #domainList} to a file.
      */  
     public static void saveDomains() throws Exception {
-        PrintFileWriter outDomains = new PrintFileWriter(outDir+"/"+outPrefix+"-Domains.txt");
+        PrintFileWriter outDomains = new PrintFileWriter(outDir+"/Domains.txt");
         domainList.forEach(s -> outDomains.println(s));
         outDomains.close();
     }
@@ -1486,30 +1534,29 @@ public class CSM implements Callable<Void> {
     /**
      * Saves the current counter matrices to files.
      */  
-    public static void saveModel(String dir, String prefix) throws Exception {
-        String outPrefix = dir+"/"+prefix;
-        N_SS.saveToCsvFile(outPrefix+"-N_SS.csv");
-        N_0S.saveToCsvFile(outPrefix+"-N_0S.csv");
-        N_FW.saveToCsvFile(outPrefix+"-N_FW.csv");
-        N_BW.saveToCsvFile(outPrefix+"-N_BW.csv");
-        N_SF.saveToCsvFile(outPrefix+"-N_SF.csv");
-        N_B.saveToCsvFile(outPrefix+"-N_B.csv");
+    public static void saveModel(String outPathPrefix) throws Exception {
+        N_SS.saveToCsvFile(outPathPrefix+"-N_SS.csv");
+        N_0S.saveToCsvFile(outPathPrefix+"-N_0S.csv");
+        N_FW.saveToCsvFile(outPathPrefix+"-N_FW.csv");
+        N_BW.saveToCsvFile(outPathPrefix+"-N_BW.csv");
+        N_SF.saveToCsvFile(outPathPrefix+"-N_SF.csv");
+        N_B.saveToCsvFile(outPathPrefix+"-N_B.csv");
         // Save N_QAS
         // Just for inspection purposes. The saved variable is not restored.
-        Files.createDirectories(Paths.get(outPrefix+"-N_AS"));
+        Files.createDirectories(Paths.get(outPathPrefix+"-N_AS"));
         int seqIdx = 0;
         for (DoubleMatrix N_AS : N_QAS.values()) {
-            N_AS.saveToCsvFile(outPrefix+"-N_AS/"+String.format("%06d", seqIdx)+".csv");
+            N_AS.saveToCsvFile(outPathPrefix+"-N_AS/"+String.format("%06d", seqIdx)+".csv");
             seqIdx++;
         }
         
         if (nuIsNotGiven) {
-            PrintFileWriter out = new PrintFileWriter(outPrefix + "-Nu.txt");
+            PrintFileWriter out = new PrintFileWriter(outPathPrefix + "-Nu.txt");
             out.println(nu);
             out.close();
         }
         if (etaIsNotGiven) {
-            PrintFileWriter out = new PrintFileWriter(outPrefix + "-Eta.txt");
+            PrintFileWriter out = new PrintFileWriter(outPathPrefix + "-Eta.txt");
             out.println(eta);
             out.close();
         }
@@ -1545,7 +1592,7 @@ public class CSM implements Callable<Void> {
     public static void loadWords() throws Exception {
         // Load wordCount, wordIndex, and wordList
         CSVParser csvWordCount = new CSVParser(
-                new BufferedFileReader(modelPathPrefix.replaceAll("-I\\d+$","")+"-WordCount.csv"),
+                new BufferedFileReader(modelPathPrefix.replaceAll("I\\d+$", "WordCount.csv")),
                 CSVFormat.EXCEL.withHeader());
         for (CSVRecord record : csvWordCount) {
             String word = record.get("Word");
@@ -1563,7 +1610,7 @@ public class CSM implements Callable<Void> {
      */
     public static void loadDomains() throws Exception {
         BufferedFileReader domainFile = 
-                new BufferedFileReader(modelPathPrefix.replaceAll("-I\\d+$","")+"-Domains.txt");
+                new BufferedFileReader(modelPathPrefix.replaceAll("I\\d+$", "Domains.txt"));
         while (domainFile.nextLine()) {
             String domain = domainFile.readLine();
             domainIndex.put(domain, domainIndex.size());
@@ -1578,6 +1625,7 @@ public class CSM implements Callable<Void> {
      */
     private static class RawInstance {
         String author = null;
+        String label = null;
         String text = null;
         Vector<Vector<String>> sentences = new Vector<Vector<String>>();
     }
