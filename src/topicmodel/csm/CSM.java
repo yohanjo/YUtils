@@ -37,6 +37,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
 import edu.stanford.nlp.ling.HasWord;
+import edu.stanford.nlp.ling.CoreAnnotations.IsDateRangeAnnotation;
 import edu.stanford.nlp.process.DocumentPreprocessor;
 import util.container.Counter;
 import util.io.BufferedFileReader;
@@ -57,6 +58,7 @@ public class CSM implements Callable<Void> {
     static boolean updateParams;  // Update parameters?
     static boolean nuIsNotGiven;  // nu is not given?
     static boolean etaIsNotGiven;  // eta is not given?
+    static boolean labelIsGiven;  // Label information is given?
     static boolean useDomain;  // Use the true domain information?
     static boolean useMultiLevel;  // Use the multi-level structure?
     static boolean tokenization;
@@ -505,6 +507,9 @@ public class CSM implements Callable<Void> {
 
         CSVParser inData = new CSVParser(
                 new FileReader(inDir+"/"+dataFileName), CSVFormat.EXCEL.withHeader());
+        
+        labelIsGiven = inData.getRecords().contains("Label"); 
+
         for (CSVRecord record : inData) {
             String seqId = record.get("SeqId");
             int instNo = Integer.valueOf(record.get("InstNo"));
@@ -521,7 +526,7 @@ public class CSM implements Callable<Void> {
 
             RawInstance inst = new RawInstance();
 
-            inst.label = record.get("Label");
+            if (labelIsGiven) inst.label = record.get("Label");
             inst.text = record.get("Text");
             if (tokenization) {
                 inst.text = inst.text.replaceAll("https?://\\S+", "URLURL");
@@ -669,6 +674,7 @@ public class CSM implements Callable<Void> {
             
             if (nuIsNotGiven) nu = random.nextDouble();
             if (etaIsNotGiven) eta = random.nextDouble();
+            System.err.println(eta);
         } else {
             restoreModel();
         }
@@ -1060,8 +1066,12 @@ public class CSM implements Callable<Void> {
      * @return one sample.
      */
     public static double sliceSampling(DoubleFunction<Double> logP) {
-        double stepSize = 0.05;
+        double stepSize = 0.20;
         int numSliceSampling = 100;
+        
+//        for (int i = 0; i < 100; i++)
+//            System.err.print(String.format("%.3f\t", logP.apply(i/100.0)));
+//        System.err.println();
         
         Random random = new Random();
         int[] hist = new int[10];  // Histogram of samples
@@ -1090,8 +1100,11 @@ public class CSM implements Callable<Void> {
                 if (newXs[i] < x) start = newXs[i];
                 else end = newXs[i];
             }
+//            System.err.println(start + " : " + end + " : " + newXs[i]);
             hist[(int)(newXs[i] / 0.1)]++;
         }
+//        for (int i = 0; i < 10; i++) System.err.print(String.format("%d ", hist[i]));
+//        System.err.println();
         return newXs[random.nextInt(numSliceSampling)];
     }
 
@@ -1386,6 +1399,7 @@ public class CSM implements Callable<Void> {
         
         CSVPrinter outInstAssign = new CSVPrinter(new PrintFileWriter(
                 outPathPrefix+"-InstAssign.csv"), CSVFormat.EXCEL);
+
         outInstAssign.printRecord("SeqId", "InstNo", "Author", "Label", 
                                   "Text", "TaggedText", "State", "BTopic");
 
@@ -1408,12 +1422,12 @@ public class CSM implements Callable<Void> {
                         }
                     }
                     outInstAssign.printRecord(seqKey, instNo, rawSeq.get(instNo).author, 
-                            rawSeq.get(instNo).label, rawSeq.get(instNo).text, 
+                            (labelIsGiven ? rawSeq.get(instNo).label : ""), rawSeq.get(instNo).text, 
                             taggedText.toString().trim(), inst.state, 
                             seqVal.bTopic+(useDomain ? " ("+domainList.get(seqVal.bTopic)+")" : ""));
                 } else { 
                     outInstAssign.printRecord(seqKey, instNo, rawSeq.get(instNo).author, 
-                            rawSeq.get(instNo).label, rawSeq.get(instNo).text, "", "", "");
+                            (labelIsGiven ? rawSeq.get(instNo).label : ""), rawSeq.get(instNo).text, "", "", "");
                 }
             }
         }
