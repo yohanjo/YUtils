@@ -37,7 +37,6 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
 import edu.stanford.nlp.ling.HasWord;
-import edu.stanford.nlp.ling.CoreAnnotations.IsDateRangeAnnotation;
 import edu.stanford.nlp.process.DocumentPreprocessor;
 import util.container.Counter;
 import util.io.BufferedFileReader;
@@ -508,7 +507,7 @@ public class CSM implements Callable<Void> {
         CSVParser inData = new CSVParser(
                 new FileReader(inDir+"/"+dataFileName), CSVFormat.EXCEL.withHeader());
         
-        labelIsGiven = inData.getRecords().contains("Label"); 
+        labelIsGiven = inData.getHeaderMap().containsKey("Label");
 
         for (CSVRecord record : inData) {
             String seqId = record.get("SeqId");
