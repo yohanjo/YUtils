@@ -83,8 +83,8 @@ Command example: `java STTM -i 200 -to 100 -d /input/dir -data data.csv -conf co
 ## Output Files
 
 All output file names have the form of either
-	`STTM-[DATA_File]-[CONFIG_FILE]-S[NUM_STATES]-I[NUM_ITERATIONS]-[VARIABLE].csv`
-	`STTM-[DATA_File]-[CONFIG_FILE]-S[NUM_STATES]-I[NUM_ITERATIONS]-[ENTRY_KEY]-[VARIABLE].csv`
+* `STTM-[DATA_File]-[CONFIG_FILE]-S[NUM_STATES]-I[NUM_ITERATIONS]-[VARIABLE].csv`
+* `STTM-[DATA_File]-[CONFIG_FILE]-S[NUM_STATES]-I[NUM_ITERATIONS]-[ENTRY_KEY]-[VARIABLE].csv`
 
 ### Entry-Independent Variables
 	Pi

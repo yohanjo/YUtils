@@ -1,0 +1,28 @@
+{
+    "statuses": ["F_NoOne", "SF_GoalBystander", "F_GoalBystander", "SF_GoalParticipant", "F_GoalParticipant", "SF_GoalSetter", "F_GoalSetter"],
+    "gamma": 0.1,
+    "num_states": 5,
+    "entries": [
+        {
+            "key": "Discussion",
+            "type": "LDA",
+            "num_topics": 5,
+            "alpha": 0.1,
+            "beta": 0.001,
+            "num_prob_words": 30,
+            "min_words": 3,
+            "stopwords": ["#", "the", ",", ".", "to", "of", "and", "a", "in", "is", "i", ")", "for", ":", "(", "that", "this", "it", "on", "with", "as", "be", "are", "or", "-", "my", "from", "you", "have", "not", "?", "``", "'s", "we", "''", "an", "what", "by", "was", "but", "which", "at", "n't", "'", "!", "$", "%", "&", "rt"]
+        },
+        {
+            "key": "Dtype",
+            "type": "MM",
+            "alpha": 0.1
+        },
+        {
+            "key": "SRL",
+            "type": "MM",
+            "alpha": 0.1
+        }
+    ]
+}
+
