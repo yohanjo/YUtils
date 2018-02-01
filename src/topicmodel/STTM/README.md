@@ -6,53 +6,54 @@ Cite: Y. Jo, G. Tomar, O. Ferschke, C. P. Rose, D. Gasevic. Expediting Support f
 
 ## Input Files
 
-	* data.csv (required)
-	* config.json (reqiured)
+* data.csv (required)
+* config.json (reqiured)
 
 ### data.csv
-	This file must contain five required columns and additional optional columns with corresponding headers. Each row represents an instance at a certain time point.
-	* SeqId: Sequence ID.
-	* InstNo: Instance number in the sequence. The model automatically sorts the instances of a sequence in the ascending order of InstNo.
-	* FromStatus: Status right before the current time point.
-	* ToStatus: Status of the current time point.
-	* [EntryKey]: Content of the instance. You should define your own entry key (e.g., "Discussion", "Dtype"). If the entry type is LDA, this field is plain text. If the entry type is MM, this field is tokens separated by commas. The type of each entry is set in the configuration file described below.
+This file must contain five required columns and additional optional columns with corresponding headers. Each row represents an instance at a certain time point.
+* SeqId: Sequence ID.
+* InstNo: Instance number in the sequence. The model automatically sorts the instances of a sequence in the ascending order of InstNo.
+* FromStatus: Status right before the current time point.
+* ToStatus: Status of the current time point.
+* [EntryKey]: Content of the instance. You should define your own entry key (e.g., "Discussion", "Dtype"). If the entry type is LDA, this field is plain text. If the entry type is MM, this field is tokens separated by commas. The type of each entry is set in the configuration file described below.
 
 ### config.json
-	This JSON file requires the following structure:
-	* statuses (string array, optional): Statuses to be considered. If not set, all statuses existing in the data file are included. If you don't want to condition state transitions on statuses, this should be reflected in the data file; set the values of the "FromStatus" and "ToStatus" columns in the data file to one value.
-	* gamma (float, required): Hyperparameter that determines the sparsity of state transition probabilities.
-	* num_states (int, required): Number of states to be learned.
-	* entries (array of JSON objects, required): Parameters for the entries to be considered.
+This JSON file requires the following structure:
+* statuses (string array, optional): Statuses to be considered. If not set, all statuses existing in the data file are included. If you don't want to condition state transitions on statuses, this should be reflected in the data file; set the values of the "FromStatus" and "ToStatus" columns in the data file to one value.
+* gamma (float, required): Hyperparameter that determines the sparsity of state transition probabilities.
+* num_states (int, required): Number of states to be learned.
+* entries (array of JSON objects, required): Parameters for the entries to be considered.
 
-	An entry's type is either "LDA" or "MM". An LDA-type entry assumes a latent topic distribution, where each topic is a probability distribution over observations. An MM-type entry assumes a direct multinomial distribution over observations without a latent topic distribution. 
-	An LDA-type entry object requires the following structure:
-	* key (string, required): Name of the entry. The data file must contain a column with the same key.
-	* type (string, required): Type of the entry. The value must be "LDA".
-	* num_topics (int, required): Number of topics to be considered.
-	* alpha (float, required): Hyperparameter that determines the sparsity of the topic distribution.
-	* beta (float, required): Hyperparameter that determines the sparsity of the word distribution of each topic.
-	* num_prob_words (int, optional): Number of top words to be displayed in the output "ProbWords" file. If not set, 100 is the default value.
-	* min_words (int, optional): Minimum frequency of words to be included in the vocabulary. If not set, 1 is the default value, i.e., all words existing in the data file are considered.
-	* stopwords (string array, optional): Stop words to be excluded from the vocabulary. If not set, no stop word is used.
-	* words (string array, optional): Words to be included in the vocabulary. If not set, all words existing in the data file are considered.
+An entry's type is either "LDA" or "MM". An LDA-type entry assumes a latent topic distribution, where each topic is a probability distribution over observations. An MM-type entry assumes a direct multinomial distribution over observations without a latent topic distribution. 
+An LDA-type entry object requires the following structure:
+* key (string, required): Name of the entry. The data file must contain a column with the same key.
+* type (string, required): Type of the entry. The value must be "LDA".
+* num_topics (int, required): Number of topics to be considered.
+* alpha (float, required): Hyperparameter that determines the sparsity of the topic distribution.
+* beta (float, required): Hyperparameter that determines the sparsity of the word distribution of each topic.
+* num_prob_words (int, optional): Number of top words to be displayed in the output "ProbWords" file. If not set, 100 is the default value.
+* min_words (int, optional): Minimum frequency of words to be included in the vocabulary. If not set, 1 is the default value, i.e., all words existing in the data file are considered.
+* stopwords (string array, optional): Stop words to be excluded from the vocabulary. If not set, no stop word is used.
+* words (string array, optional): Words to be included in the vocabulary. If not set, all words existing in the data file are considered.
 
-	An MM-type entry object requires the following structure:
-	* key (string, required): Name of the entry. The data file must contain a column with the same key.
-	* type (string, required): Type of the entry. The value must be "MM".
-	* alpha (float, required): Hyperparameter that determines the sparsity of the observation distribution.
-	* tokens (string array, optional): Observation tokens to be included in the vocabulary. If not set, all tokens existing in the data file are considered.
+An MM-type entry object requires the following structure:
+* key (string, required): Name of the entry. The data file must contain a column with the same key.
+* type (string, required): Type of the entry. The value must be "MM".
+* alpha (float, required): Hyperparameter that determines the sparsity of the observation distribution.
+* tokens (string array, optional): Observation tokens to be included in the vocabulary. If not set, all tokens existing in the data file are considered.
 
 
 
 ## Dependencies
 
 The following files in the "rsc" folder should be in your build path.
-	* commons-csv-1.4.jar
-	* slf4j-api.jar
-	* slf4j-simple.jar
-	* stanford-postagger-3.6.0.jar
+* commons-csv-1.4.jar
+* slf4j-api.jar
+* slf4j-simple.jar
+* stanford-postagger-3.6.0.jar
+
 You also need the following model file for POS tagging. The default location is "{PROJECT_DIR}/rsc/". You can change the path or model in the source code.
-	* english-left3words-distsim.tagger
+* english-left3words-distsim.tagger
 
 
 
