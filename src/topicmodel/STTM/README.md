@@ -1,7 +1,8 @@
 # STTM
 
 State Transition Topic Model (STTM) that supports multiple observation sets, each with/without latent topic distribution.
-Cite: Y. Jo, G. Tomar, O. Ferschke, C. P. Rose, D. Gasevic. Expediting Support for Social Learning with Behavior Modeling. In Proceedings of the 9th International Conference on Educational Data Mining (EDM), 2016
+
+Cite: `Y. Jo, G. Tomar, O. Ferschke, C. P. Rose, D. Gasevic. Expediting Support for Social Learning with Behavior Modeling. In Proceedings of the 9th International Conference on Educational Data Mining (EDM), 2016`
 
 
 ## Input Files
@@ -46,15 +47,12 @@ An MM-type entry object requires the following structure:
 
 ## Dependencies
 
-The following files in the "rsc" folder should be in your build path.
+The following files in the `rsc` folder should be in your build path.
 * commons-csv-1.4.jar
 * slf4j-api.jar
 * slf4j-simple.jar
 * stanford-postagger-3.6.0.jar
-
-You also need the following model file for POS tagging. The default location is "{PROJECT_DIR}/rsc/". You can change the path or model in the source code.
-* english-left3words-distsim.tagger
-
+* english-left3words-distsim.tagger (for POS tagging)
 
 
 ## Command Options
